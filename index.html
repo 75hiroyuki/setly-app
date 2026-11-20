@@ -2,7 +2,10 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Setly</title>
-<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Setly">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#14213d">
 <style>html,body{margin:0;height:100%;background:#14213d;color:#e8eef8;font:15px sans-serif}
@@ -33,6 +36,7 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
   }
   function open(id){
     remember(id);
+    try{ var u = location.pathname+'?id='+encodeURIComponent(id); if(location.pathname+location.search !== u || location.hash) history.replaceState(null,'',u); }catch(e){}
     document.getElementById('msg').hidden=true;
     var f=document.createElement('iframe');
     f.src='https://script.google.com/macros/s/'+id+'/exec?page=timebox';
@@ -47,8 +51,10 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
     });
   }
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
-  // # 付きで開かれたら最優先。URLの # は消さない(ブックマーク・ホーム画面追加にIDが残るように)
-  var id = pick(location.hash.replace(/^#/,'')) || pick(lsGet()) || pick(ckGet());
+  // 接続先IDは「URLそのもの(?id=…)」に持たせるのが本命。ホーム画面のアイコンはURLを覚えるので、
+  // スマホの保存データが消えても毎回そのIDで開ける。保存データは予備。
+  var q = location.search.match(/[?&]id=([^&]+)/);
+  var id = pick(q && decodeURIComponent(q[1])) || pick(location.hash.replace(/^#/,'')) || pick(lsGet()) || pick(ckGet());
   if(id){ open(id); return; }
   cacheGet().then(function(v){ v=pick(v); if(v) open(v); else ask(); });
 })();
