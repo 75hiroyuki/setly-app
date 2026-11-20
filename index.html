@@ -7,17 +7,49 @@
 <meta name="theme-color" content="#14213d">
 <style>html,body{margin:0;height:100%;background:#14213d;color:#e8eef8;font:15px sans-serif}
 iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
-#msg{padding:24px;line-height:1.7}</style></head><body>
-<div id="msg" hidden>Setlyの接続先が未設定です。<br>最初に、このページのURLの末尾に <code>#</code> と接続先IDを付けて一度開いてください。</div>
+#msg{padding:24px;line-height:1.7}
+#f{display:flex;gap:8px}#in{flex:1;min-width:0;font:16px sans-serif;padding:10px;border-radius:8px;border:0}#f button{font:15px sans-serif;padding:10px 14px;border-radius:8px;border:0;background:#5b95ff;color:#0c1426;font-weight:700}.s{font-size:12px;opacity:.75}</style></head><body>
+<div id="msg" hidden>
+<p>Setlyの接続先が未設定です（スマホが保存データを消した可能性があります）。</p>
+<form id="f"><input id="in" placeholder="接続先ID、またはGASのURL" autocomplete="off" autocapitalize="off" spellcheck="false">
+<button>保存して開く</button></form>
+<p class="s">GASのWebアプリURL（https://script.google.com/macros/s/…/exec）をそのまま貼り付けてもOKです。</p>
+</div>
 <script>
 (function(){
-  var K='setlyGasId', id='';
-  try{ var h=location.hash.replace(/^#/,''); if(h){localStorage.setItem(K,h); history.replaceState(null,'',location.pathname);} id=localStorage.getItem(K)||''; }catch(e){}
-  if(!/^[A-Za-z0-9_-]{20,}$/.test(id)){document.getElementById('msg').hidden=false;return;}
-  var f=document.createElement('iframe');
-  f.src='https://script.google.com/macros/s/'+id+'/exec?page=timebox';
-  f.allow='clipboard-write; fullscreen';
-  document.body.appendChild(f);
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+  // 接続先IDは公開リポジトリに書けないので端末に保存する。
+  // ただしiPhone等は localStorage を消すことがある(使わない日が続いた・容量不足・ホーム画面版とSafariは保存場所が別)ため、
+  // 保存先を複数にし、消えていても画面上で入れ直せるようにする(ホーム画面版はURL欄が無く # を付けられない)
+  var K='setlyGasId', C='setly-config', RE=/^[A-Za-z0-9_-]{20,}$/;
+  function pick(v){ v=String(v||'').trim(); var m=v.match(/\/macros\/s\/([A-Za-z0-9_-]+)/); if(m) v=m[1]; return RE.test(v)?v:''; }
+  function lsGet(){ try{ return localStorage.getItem(K)||''; }catch(e){ return ''; } }
+  function ckGet(){ var m=document.cookie.match(/(?:^|; )setlyGasId=([^;]+)/); return m?decodeURIComponent(m[1]):''; }
+  function cacheGet(){ if(!window.caches) return Promise.resolve(''); return caches.open(C).then(function(c){ return c.match('id'); }).then(function(r){ return r?r.text():''; }).catch(function(){ return ''; }); }
+  function remember(id){
+    try{ localStorage.setItem(K,id); }catch(e){}
+    document.cookie='setlyGasId='+encodeURIComponent(id)+'; max-age=34560000; path=/; secure; samesite=strict';
+    if(window.caches) caches.open(C).then(function(c){ return c.put('id', new Response(id)); }).catch(function(){});
+    if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function(){});
+  }
+  function open(id){
+    remember(id);
+    document.getElementById('msg').hidden=true;
+    var f=document.createElement('iframe');
+    f.src='https://script.google.com/macros/s/'+id+'/exec?page=timebox';
+    f.allow='clipboard-write; fullscreen';
+    document.body.appendChild(f);
+  }
+  function ask(){
+    document.getElementById('msg').hidden=false;
+    document.getElementById('f').addEventListener('submit', function(e){
+      e.preventDefault(); var id=pick(document.getElementById('in').value);
+      if(id) open(id); else alert('接続先IDの形が正しくありません');
+    });
+  }
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+  // # 付きで開かれたら最優先。URLの # は消さない(ブックマーク・ホーム画面追加にIDが残るように)
+  var id = pick(location.hash.replace(/^#/,'')) || pick(lsGet()) || pick(ckGet());
+  if(id){ open(id); return; }
+  cacheGet().then(function(v){ v=pick(v); if(v) open(v); else ask(); });
 })();
 </script></body></html>
